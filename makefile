@@ -2,70 +2,72 @@
 NAMESPACE = spark-technical-test-data-platform
 SPARK_VALUES = spark/values.yaml
 ZEPPELIN_VALUES = corrigir-values/values.yaml
-#ZEPPELIN_TEMP_VALUES = corrigir-values-temp/values-temp.yaml
+ENV ?= minikube  # Pode ser 'k3d' ou 'minikube'
 
-# Host fixo para uso com K3D (nip.io resolve 127.0.0.1)
-ZEPPELIN_INGRESS_HOST := zeppelin.127.0.0.1.nip.io
+ifeq ($(ENV), minikube)
+  CONTEXT = minikube
+  CLUSTER_IP := $(shell minikube ip)
+else
+  CONTEXT = k3d-test-cluster
+  CLUSTER_IP := 127.0.0.1
+endif
 
-# Atualiza e adiciona repositórios Helm necessários
+ZEPPELIN_INGRESS_HOST := zeppelin.$(CLUSTER_IP).nip.io
+
 .PHONY: repo-add
 repo-add:
 	helm repo add bitnami https://charts.bitnami.com/bitnami
 	helm repo add duyet https://duyet.github.io/charts || true
 	helm repo update
 
-# Cria o namespace necessário
-.PHONY: local-namespace
-local-namespace:
-	kubectl config use-context k3d-test-cluster
+.PHONY: set-context
+set-context:
+	kubectl config use-context $(CONTEXT)
+
+.PHONY: create-namespace
+create-namespace:
 	kubectl create namespace $(NAMESPACE) || true
 
-# Cria o clusterrolebinding para o Zeppelin
-.PHONY: local-clusterrolebinding
-local-clusterrolebinding:
+.PHONY: create-clusterrolebinding
+create-clusterrolebinding:
 	kubectl create clusterrolebinding zeppelin-cluster-admin-binding \
 	--clusterrole=cluster-admin \
 	--serviceaccount=$(NAMESPACE):zeppelin || true
 
-# Gera values.yaml corrigido para Zeppelin com ingress válido e serviceAccount
-#.PHONY: prepare-zeppelin-values
-#prepare-zeppelin-values:
-#	@echo "🛠️  Preparando valores do Zeppelin..."
-#	@mkdir -p zeppelin
-#	@echo "ingress:" > $(ZEPPELIN_TEMP_VALUES)
-#	@echo "  enabled: true" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "  annotations:" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "    kubernetes.io/ingress.class: nginx" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "  hosts:" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "    - host: zeppelin.127.0.0.1.nip.io" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "      paths:" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "        - path: /" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "          pathType: Prefix" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "  tls: []" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "serviceAccount:" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "  create: true" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "Valores temporários gerados em $(ZEPPELIN_TEMP_VALUES)"
+.PHONY: reset-pods
+reset-pods:
+	@echo "🧹 Limpando pods do namespace $(NAMESPACE)..."
+	kubectl delete pods --all -n $(NAMESPACE) || true
 
-# Instala/atualiza os componentes do Spark e Zeppelin
-.PHONY: local-upgrade
-local-upgrade: repo-add local-namespace local-clusterrolebinding 
+.PHONY: upgrade
+upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-pods
 	@echo "🚀 Instalando Spark..."
-	helm upgrade --install spark bitnami/spark -f $(SPARK_VALUES) -n $(NAMESPACE) --debug
+	helm upgrade --install spark bitnami/spark -f $(SPARK_VALUES) \
+		-n $(NAMESPACE) \
+		--force \
+		--debug \
+		--set master.readinessProbe.initialDelaySeconds=90
+
 	@echo "🚀 Instalando Zeppelin..."
-	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) --version 0.1.3 -n $(NAMESPACE) --debug
+	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) \
+		--version 0.1.3 \
+		-n $(NAMESPACE) \
+		--force \
+		--debug
 
-# Comando completo para implantação local
 .PHONY: deploy-all
-deploy-all: local-upgrade
+deploy-all: upgrade
 
-# Mostra informações de acesso
 .PHONY: get-info
 get-info:
 	@echo "\nSpark Master UI:"
-	@kubectl port-forward -n $(NAMESPACE) svc/spark-master-svc 80:80 &
-	@echo "→ http://127.0.0.1:80"
+	@kubectl port-forward -n $(NAMESPACE) svc/spark-master-headless 7077:7077 &
+	@echo "→ Spark Cluster: spark://spark-master-headless.$(NAMESPACE).svc.cluster.local:7077"
 	@echo "\nZeppelin UI:"
 	@echo "→ http://$(ZEPPELIN_INGRESS_HOST)"
+
+
+
 
 
 

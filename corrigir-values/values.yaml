@@ -5,12 +5,17 @@ ingress:
   annotations:
     kubernetes.io/ingress.class: nginx
   hosts:
-    - host: zeppelin.127.0.0.1.nip.io
+    - host: zeppelin.192.168.49.2.nip.io
       paths:
         - /
 
 serviceAccount:
   create: true
+
+interpreter:
+  spark:
+    properties:
+      spark.kubernetes.container.image: "docker.io/bitnami/spark:4.0.0-debian-12-r2"
 
 image:
   repository: apache/zeppelin
@@ -18,15 +23,27 @@ image:
   pullPolicy: IfNotPresent
 
 env:
-  SERVICE_DOMAIN: "zeppelin.127.0.0.1.nip.io"
-  ZEPPELIN_K8S_SPARK_CONTAINER_IMAGE: gcr.io/spark-operator/spark:v3.1.1
+  SERVICE_DOMAIN: "zeppelin.192.168.49.2.nip.io"
+  ZEPPELIN_K8S_SPARK_CONTAINER_IMAGE: bitnami/spark:4.0.0-debian-12-r2
   ZEPPELIN_K8S_CONTAINER_IMAGE: apache/zeppelin:0.11.2
   ZEPPELIN_HOME: /opt/zeppelin
   ZEPPELIN_PORT: 8080
   ZEPPELIN_SERVER_RPC_PORTRANGE: 12320:12320
   FLINK_HOME: /opt/flink
-  SPARK_MASTER: k8s://https://kubernetes.default.svc
-  SPARK_HOME: /spark
+  SPARK_MASTER: spark://spark-master-headless.default.svc.cluster.local:7077  # <--- CORREÇÃO APLICADA
+  HOST_IP:
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP  # <--- CORREÇÃO APLICADA
+  SPARK_HOME: /opt/bitnami/spark  # <--- CORREÇÃO APLICADA
+  ZEPPELIN_SPARK_CONF: >-                                  # <--- CORREÇÃO APLICADA
+    --conf spark.master=spark://spark-master-headless:7077
+    --conf spark.submit.deployMode=client
+    --conf spark.driver.host=$(HOST_IP)
+    --conf spark.driver.port=4040
+    --conf spark.driver.memory=1g
+    --conf spark.executor.memory=1g
+    --conf spark.executor.instances=2
 
 service:
   type: ClusterIP
@@ -46,9 +63,7 @@ autoscaling:
 configMap:
   enabled: true
   data:
-#   ZEPPELIN_NOTEBOOK_DIR: /notebooks
     ZEPPELIN_PORT: "8080"
-#   ZEPPELIN_LOG_DIR: /logs
 
 podAnnotations: {}
 
@@ -75,6 +90,7 @@ livenessProbe:
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 10
+
 
 
 
