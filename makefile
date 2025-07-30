@@ -17,7 +17,7 @@ repo-add:
 # Cria o namespace necessário
 .PHONY: local-namespace
 local-namespace:
-	kubectl config use-context k3d-dev
+	kubectl config use-context k3d-test-cluster
 	kubectl create namespace $(NAMESPACE) || true
 
 # Cria o clusterrolebinding para o Zeppelin
