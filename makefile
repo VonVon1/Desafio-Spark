@@ -52,7 +52,7 @@ local-upgrade: repo-add local-namespace local-clusterrolebinding
 	@echo "🚀 Instalando Spark..."
 	helm upgrade --install spark bitnami/spark -f $(SPARK_VALUES) -n $(NAMESPACE) --debug
 	@echo "🚀 Instalando Zeppelin..."
-	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) -n $(NAMESPACE) --debug
+	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) --version 0.1.3 -n $(NAMESPACE) --debug
 
 # Comando completo para implantação local
 .PHONY: deploy-all
