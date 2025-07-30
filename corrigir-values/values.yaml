@@ -17,7 +17,7 @@ image:
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8443
 
 resources:
   limits:
