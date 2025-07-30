@@ -58,6 +58,23 @@ tolerations: []
 
 affinity: {}
 
+readinessProbe:
+  httpGet:
+    path: /
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 10
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8080
+  initialDelaySeconds: 40
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 10
 
 
 
