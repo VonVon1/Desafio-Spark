@@ -54,6 +54,29 @@ local-upgrade: repo-add local-namespace local-clusterrolebinding
 	@echo "🚀 Instalando Zeppelin..."
 	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) -n $(NAMESPACE) --debug
 
+# Aguarda os pods ficarem prontos com timeout
+.PHONY: wait-pods
+wait-pods:
+	@echo "⏳ Aguardando pods ficarem prontos..."
+	@kubectl wait --for=condition=Ready pods --all -n $(NAMESPACE) --timeout=600s || \
+	( echo "❌ Timeout esperando pods. Mostrando eventos:" && \
+	kubectl get pods -n $(NAMESPACE) && \
+	kubectl describe pods -n $(NAMESPACE) && \
+	exit 1 )
+
+# Mostra informações úteis (pods, eventos e logs iniciais)
+.PHONY: check-pods
+check-pods:
+	@echo "📦 Pods:"
+	@kubectl get pods -n $(NAMESPACE)
+	@echo "📜 Eventos:"
+	@kubectl get events -n $(NAMESPACE) --sort-by='.metadata.creationTimestamp'
+	@echo "📄 Logs iniciais:"
+	@for pod in $$(kubectl get pods -n $(NAMESPACE) -o jsonpath='{.items[*].metadata.name}'); do \
+		echo "--- pod/$$pod ---"; \
+		kubectl logs $$pod -n $(NAMESPACE) --tail=30 || echo "Sem logs disponíveis ainda."; \
+	done
+
 # Comando completo para implantação local
 .PHONY: deploy-all
 deploy-all: local-upgrade

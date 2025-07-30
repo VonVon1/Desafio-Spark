@@ -51,7 +51,7 @@ jobs:
           echo "📄 Logs iniciais:"
           kubectl get pods -n spark-technical-test-data-platform -o name | while read pod; do
             echo "--- $pod ---"
-            kubectl logs -n spark-technical-test-data-platform $pod --tail=120 || true
+            kubectl logs -n spark-technical-test-data-platform $pod --tail=30 || true
           done
 
 
