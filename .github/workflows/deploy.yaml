@@ -37,3 +37,21 @@ jobs:
         run: |
           kubectl get all -n spark-technical-test-data-platform
 
+      - name: 🕵️ Observar pods e eventos por 30s
+        run: |
+          echo "⏳ Aguardando pods ficarem prontos..."
+          kubectl wait --for=condition=Ready pods --all -n spark-technical-test-data-platform --timeout=120s || true
+       
+          echo "📦 Pods:"
+          kubectl get pods -n spark-technical-test-data-platform
+       
+          echo "📜 Eventos:"
+          kubectl get events -n spark-technical-test-data-platform --sort-by=.metadata.creationTimestamp
+       
+          echo "📄 Logs iniciais:"
+          kubectl get pods -n spark-technical-test-data-platform -o name | while read pod; do
+            echo "--- $pod ---"
+            kubectl logs -n spark-technical-test-data-platform $pod --tail=30 || true
+          done
+
+
