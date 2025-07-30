@@ -17,7 +17,7 @@ image:
 
 service:
   type: ClusterIP
-  port: 8443
+  port: 8080
 
 resources:
   limits:
@@ -33,9 +33,9 @@ autoscaling:
 configMap:
   enabled: true
   data:
-    ZEPPELIN_NOTEBOOK_DIR: /notebooks
+#   ZEPPELIN_NOTEBOOK_DIR: /notebooks
     ZEPPELIN_PORT: "8080"
-    ZEPPELIN_LOG_DIR: /logs
+#   ZEPPELIN_LOG_DIR: /logs
 
 podAnnotations: {}
 
