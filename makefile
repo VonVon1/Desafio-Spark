@@ -4,10 +4,8 @@ SPARK_VALUES = spark/values.yaml
 ZEPPELIN_VALUES = corrigir-values/values.yaml
 #ZEPPELIN_TEMP_VALUES = corrigir-values-temp/values-temp.yaml
 
-# Descobre IP para o Ingress com fallback para localhost
-ZEPPELIN_INGRESS_HOST := zeppelin.$(shell \
-	kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || \
-	echo "127.0.0.1").nip.io
+# Host fixo para uso com K3D (nip.io resolve 127.0.0.1)
+ZEPPELIN_INGRESS_HOST := zeppelin.127.0.0.1.nip.io
 
 # Atualiza e adiciona repositórios Helm necessários
 .PHONY: repo-add
@@ -19,7 +17,7 @@ repo-add:
 # Cria o namespace necessário
 .PHONY: local-namespace
 local-namespace:
-	kubectl config use-context docker-desktop
+	kubectl config use-context k3d-dev
 	kubectl create namespace $(NAMESPACE) || true
 
 # Cria o clusterrolebinding para o Zeppelin
@@ -39,7 +37,7 @@ local-clusterrolebinding:
 #	@echo "  annotations:" >> $(ZEPPELIN_TEMP_VALUES)
 #	@echo "    kubernetes.io/ingress.class: nginx" >> $(ZEPPELIN_TEMP_VALUES)
 #	@echo "  hosts:" >> $(ZEPPELIN_TEMP_VALUES)
-#	@echo "    - host: zeppelin.$$(echo 127.0.0.1).nip.io" >> $(ZEPPELIN_TEMP_VALUES)
+#	@echo "    - host: zeppelin.127.0.0.1.nip.io" >> $(ZEPPELIN_TEMP_VALUES)
 #	@echo "      paths:" >> $(ZEPPELIN_TEMP_VALUES)
 #	@echo "        - path: /" >> $(ZEPPELIN_TEMP_VALUES)
 #	@echo "          pathType: Prefix" >> $(ZEPPELIN_TEMP_VALUES)
@@ -68,6 +66,7 @@ get-info:
 	@echo "→ http://127.0.0.1:80"
 	@echo "\nZeppelin UI:"
 	@echo "→ http://$(ZEPPELIN_INGRESS_HOST)"
+
 
 
 
