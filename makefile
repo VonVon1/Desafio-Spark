@@ -12,9 +12,9 @@ ZEPPELIN_INGRESS_HOST := zeppelin.$(shell \
 # Atualiza e adiciona repositórios Helm necessários
 .PHONY: repo-add
 repo-add:
-	helm repo update
 	helm repo add bitnami https://charts.bitnami.com/bitnami
 	helm repo add duyet https://duyet.github.io/charts || true
+	helm repo update
 
 # Cria o namespace necessário
 .PHONY: local-namespace
