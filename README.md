@@ -54,4 +54,5 @@ Este repositório contém o provisionamento e configuração de um ambiente Apac
 
 ## 📸 Galeria de Evidências
 
-Imagens salvas no diretório `evidencias/` dentro deste ZIP.
+Imagens salvas no diretório `evidencias/` 
+Pipeline dentro da pasta ./.github/workflows/deploy.yaml
