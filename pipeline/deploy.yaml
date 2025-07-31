@@ -1,0 +1,84 @@
+name: Deploy Spark and Zeppelin
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+
+      - name: ⚙️ Set up K3s (Lightweight Kubernetes)
+        uses: AbsaOSS/k3d-action@v2
+        with:
+          cluster-name: test-cluster
+          wait: true
+
+      - name: 📥 Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.13.0
+
+      - name: ⚙️ Install dependencies (GNU Make, etc.)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make
+     
+      - name: 🚀 Deploy Spark and Zeppelin via Makefile
+        run: |
+          make deploy-all ENV=k3d
+
+      - name: 🔍 Check deployed resources
+        run: |
+          kubectl get all -n spark-technical-test-data-platform
+
+      - name: 🕵️ Aguardar pods e verificar logs iniciais
+        run: |
+          echo "⏳ Aguardando pods ficarem prontos..."
+          kubectl wait --for=condition=Ready pods --all -n spark-technical-test-data-platform --timeout=120s || true
+
+          echo "📦 Pods:"
+          kubectl get pods -n spark-technical-test-data-platform
+
+          echo "📜 Eventos:"
+          kubectl get events -n spark-technical-test-data-platform --sort-by=.metadata.creationTimestamp
+
+          echo "📄 Logs iniciais:"
+          kubectl get pods -n spark-technical-test-data-platform -o name | while read pod; do
+            echo "--- $pod ---"
+            kubectl logs -n spark-technical-test-data-platform $pod --tail=30 || true
+          done
+
+      - name: 🕵️ Verificar status final dos pods
+        run: |
+          NAMESPACE=${NAMESPACE:-spark-technical-test-data-platform}
+          echo "⏳ Aguardando pods ficarem prontos no namespace '$NAMESPACE'..."
+          if ! kubectl wait --for=condition=Ready pods --all -n "$NAMESPACE" --timeout=600s; then
+           echo "❌ Timeout esperando pods. Mostrando eventos:"
+           kubectl get pods -n "$NAMESPACE"
+           kubectl describe pods -n "$NAMESPACE"
+           exit 1
+          fi
+          echo "📦 Pods:"
+          kubectl get pods -n "$NAMESPACE"
+
+          echo "📜 Eventos:"
+          kubectl get events -n "$NAMESPACE" --sort-by='.metadata.creationTimestamp'
+          echo "📄 Logs finais:"
+
+         
+          echo "📄 Logs iniciais:"
+          for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
+            echo "--- pod/$pod ---"
+            kubectl logs "$pod" -n "$NAMESPACE" --tail=30 || echo "Sem logs disponíveis ainda."
+          done
+
+
+
+         
