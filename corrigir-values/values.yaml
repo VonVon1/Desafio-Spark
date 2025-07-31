@@ -97,7 +97,6 @@ initContainers:
         mountPath: /tmp/zeppelin
 
 env:
-  # Configurações do Spark
   SPARK_MASTER: "k8s://https://kubernetes.default.svc"
   SPARK_HOME: "/opt/bitnami/spark"
   SPARK_CONF_DIR: "/opt/bitnami/spark/conf"
@@ -110,8 +109,6 @@ env:
     valueFrom:
       fieldRef:
         fieldPath: status.podIP
-  
-  # Configurações do Zeppelin
   ZEPPELIN_HOME: "/opt/zeppelin"
   ZEPPELIN_CONF_DIR: "/opt/zeppelin/conf"
   JAVA_HOME: "/usr/lib/jvm/java-11-openjdk-amd64"
@@ -134,8 +131,8 @@ interpreter:
     properties:
       spark.master: "k8s://https://kubernetes.default.svc"
       spark.kubernetes.container.image: "bitnami/spark:4.0.0-debian-12-r2"
-      spark.driver.memory: "1g"  # Reduzido para Minikube
-      spark.executor.memory: "1g"  # Reduzido para Minikube
+      spark.driver.memory: "1g"
+      spark.executor.memory: "1g"
 
 service:
   type: ClusterIP
@@ -147,8 +144,8 @@ service:
 
 resources:
   limits:
-    cpu: "1"  
-    memory: "2Gi"  
+    cpu: "1"
+    memory: "2Gi"
   requests:
     cpu: "500m"
     memory: "1Gi"
@@ -158,7 +155,7 @@ autoscaling:
 
 persistence:
   enabled: true
-  size: 5Gi  # Tamanho reduzido para Minikube
+  size: 5Gi
   accessMode: ReadWriteOnce
   storageClass: "standard"
 

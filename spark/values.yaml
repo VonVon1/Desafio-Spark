@@ -1,22 +1,19 @@
-# Configuração da Imagem (DEVE ser igual à usada no Zeppelin)
 image:
   repository: bitnami/spark
   tag: 4.0.0-debian-12-r2
   pullPolicy: IfNotPresent
 
-# Configuração do Master (Crítico para o Zeppelin conectar)
 master:
   component: spark-master
   service:
     type: ClusterIP
     ports:
-      spark: 7077  # Porta principal do cluster
-      webui: 8080  # UI do Spark
-      driver: 4040  # Porta do driver (usada pelo Zeppelin)
+      spark: 7077
+      webui: 8080
+      driver: 4040
     headless:
-      enabled: true  # DNS discovery para workers
+      enabled: true
 
-# Configuração dos Workers
 worker:
   replicas: 2
   resources:
@@ -24,13 +21,11 @@ worker:
       cpu: "1"
       memory: "2Gi"
 
-# Expor métricas e serviços adicionais
 metrics:
   enabled: true
   serviceMonitor:
     enabled: false
 
-# Permissões de Serviço (Necessário para o Zeppelin)
 serviceAccount:
   create: true
   name: spark-serviceaccount
@@ -38,7 +33,6 @@ serviceAccount:
 rbac:
   create: true
 
-# Variáveis de Ambiente Específicas
 extraEnvVars:
   - name: SPARK_DRIVER_HOST
     valueFrom:
@@ -49,10 +43,9 @@ extraEnvVars:
       fieldRef:
         fieldPath: status.podIP
 
-# Configuração de Rede Adicional
 networkPolicy:
   enabled: true
-  allowExternal: true  # Permite conexão do Zeppelin
+  allowExternal: true
 
 
 
