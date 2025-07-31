@@ -30,10 +30,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y make
 
-      - name: 🧹 Uninstall previous Helm releases (Spark & Zeppelin)
-        run: |
-          helm uninstall spark --namespace spark-technical-test-data-platform || true
-          helm uninstall zeppelin --namespace spark-technical-test-data-platform || true
+#     - name: 🧹 Uninstall previous Helm releases (Spark & Zeppelin)
+#       run: |
+#         helm uninstall spark --namespace spark-technical-test-data-platform || true
+#         helm uninstall zeppelin --namespace spark-technical-test-data-platform || true
 
       - name: 🚀 Deploy Spark and Zeppelin via Makefile
         run: |

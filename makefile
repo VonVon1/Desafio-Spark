@@ -1,5 +1,7 @@
 # Variáveis configuráveis
 NAMESPACE = spark-technical-test-data-platform
+SPARK_RELEASE = spark
+ZEPPELIN_RELEASE = zeppelin
 SPARK_VALUES = spark/values.yaml
 ZEPPELIN_VALUES = corrigir-values/values.yaml
 ENV ?= minikube  # Pode ser 'k3d' ou 'minikube'
@@ -14,7 +16,8 @@ else
   MINIKUBE_IP := 127.0.0.1
 endif
 
-ZEPPELIN_INGRESS_HOST := zeppelin.$(MINIKUBE_IP).nip.io
+# Zeppelin Ingress DNS format zeppelin.{minikube-ip}.nip.io
+ZEPPELIN_INGRESS_HOST = zeppelin.$(MINIKUBE_IP).nip.io
 
 .PHONY: repo-add
 repo-add:
@@ -39,21 +42,27 @@ create-clusterrolebinding:
 .PHONY: patch-values
 patch-values:
 ifeq ($(ENV), minikube)
-	@echo "🔧 Atualizando o IP no values.yaml com IP $(MINIKUBE_IP)..."
-	sed -i 's/zeppelin\.[0-9\.]*\.nip\.io/zeppelin.$(MINIKUBE_IP).nip.io/' $(ZEPPELIN_VALUES)
+	@echo "🔧 Ambiente minikube detectado. Substituindo {minikube-ip} por $(MINIKUBE_IP)..."
+	sed -i 's/{minikube-ip}/$(MINIKUBE_IP)/g' $(ZEPPELIN_VALUES)
 else
-	@echo "🔧 Ambiente $(ENV): sem patch no values.yaml (não é Minikube)"
+	@echo "🔧 Ambiente $(ENV) detectado. Substituindo {minikube-ip} por 127.0.0.1..."
+	sed -i 's/{minikube-ip}/127.0.0.1/g' $(ZEPPELIN_VALUES)
 endif
 
-.PHONY: reset-pods
-reset-pods:
-	@echo "🧹 Limpando recursos do namespace $(NAMESPACE)..."
-	kubectl delete all,cm,secret,pvc,ingress --all -n $(NAMESPACE) || true
+
+.PHONY: uninstall
+uninstall:
+	@echo "🧹 Removendo releases Helm do namespace $(NAMESPACE)..."
+	-helm uninstall $(SPARK_RELEASE) -n $(NAMESPACE) || true
+	-helm uninstall $(ZEPPELIN_RELEASE) -n $(NAMESPACE) || true
+	@echo "🕒 Aguardando 60 segundos para garantir que os recursos sejam totalmente limpos..."
+	sleep 60
+	@echo "✅ Remoção concluída."
 
 .PHONY: upgrade
-upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-pods patch-values
+upgrade: repo-add set-context create-namespace create-clusterrolebinding uninstall patch-values
 	@echo "🚀 Instalando Spark..."
-	helm upgrade --install spark bitnami/spark -f $(SPARK_VALUES) \
+	helm upgrade --install $(SPARK_RELEASE) bitnami/spark -f $(SPARK_VALUES) \
 		-n $(NAMESPACE) \
 		--force \
 		--debug \
@@ -62,7 +71,7 @@ upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-p
 		--set image.tag=4.0.0-debian-12-r2
 
 	@echo "🚀 Instalando Zeppelin..."
-	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) \
+	helm upgrade --install $(ZEPPELIN_RELEASE) ./corrigir-values -f $(ZEPPELIN_VALUES) \
 		-n $(NAMESPACE) \
 		--force \
 		--debug \
@@ -74,13 +83,8 @@ upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-p
 .PHONY: deploy-all
 deploy-all: upgrade
 
-.PHONY: get-info
-get-info:
-	@echo "\nSpark Master UI:"
-	@kubectl port-forward -n $(NAMESPACE) svc/spark-master-headless 7077:7077 &
-	@echo "→ Spark Cluster: spark://spark-master-headless.$(NAMESPACE).svc.cluster.local:7077"
-	@echo "\nZeppelin UI:"
-	@echo "→ http://$(ZEPPELIN_INGRESS_HOST)"
+
+
 
 
 
