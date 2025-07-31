@@ -54,5 +54,9 @@ Este repositório contém o provisionamento e configuração de um ambiente Apac
 
 ## 📸 Galeria de Evidências
 
-Imagens salvas no diretório `evidencias/` 
-Pipeline dentro da pasta ./.github/workflows/deploy.yaml e /pipeline
+Imagens salvas no diretório `/resolutions` 
+Pipeline dentro da pasta `./.github/workflows/deploy.yaml e /pipeline`
+
+OBS: O values.yaml usado do zeppelin se encontra na pasta de chart corrigir-values logo a que esta na pasta zeppelin nao esta sendo usado pois trouxe o repo do chart oficial pra mudar algumas confs.
+O do spark continua no mesmo lugar.
+
