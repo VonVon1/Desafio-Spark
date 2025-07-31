@@ -29,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y make
-
+     
       - name: 🚀 Deploy Spark and Zeppelin via Makefile
         run: |
           make deploy-all ENV=k3d
@@ -65,19 +65,20 @@ jobs:
            kubectl describe pods -n "$NAMESPACE"
            exit 1
           fi
-
           echo "📦 Pods:"
           kubectl get pods -n "$NAMESPACE"
 
           echo "📜 Eventos:"
           kubectl get events -n "$NAMESPACE" --sort-by='.metadata.creationTimestamp'
-
           echo "📄 Logs finais:"
+
+         
+          echo "📄 Logs iniciais:"
           for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
             echo "--- pod/$pod ---"
             kubectl logs "$pod" -n "$NAMESPACE" --tail=30 || echo "Sem logs disponíveis ainda."
           done
 
 
-         
+
          
