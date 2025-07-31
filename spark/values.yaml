@@ -1,42 +1,58 @@
-# ... [CONTEÚDO ORIGINAL MANTIDO] ...
+# Configuração da Imagem (DEVE ser igual à usada no Zeppelin)
+image:
+  repository: bitnami/spark
+  tag: 4.0.0-debian-12-r2
+  pullPolicy: IfNotPresent
 
-worker:
-  enabled: true
-  replicaCount: 2  # <--- CORREÇÃO APLICADA: mais de 1 worker
-  # ... [demais configurações inalteradas] ...
-  initContainers: []
-  extraVolumes: []
-  extraVolumeMounts: []
-  # ... [demais configurações inalteradas] ...
-
+# Configuração do Master (Crítico para o Zeppelin conectar)
 master:
-  enabled: true
-  replicaCount: 1
-  extraContainerPorts:
-    - name: driver
-      containerPort: 4040
-      protocol: TCP  # <--- CORREÇÃO APLICADA: driver port
-  extraEnvVars:
-    - name: SPARK_DRIVER_HOST
-      valueFrom:
-        fieldRef:
-          fieldPath: status.podIP  # <--- CORREÇÃO APLICADA: expose IP
-  initContainers: []
-  extraVolumes: []
-  extraVolumeMounts: []
+  component: spark-master
+  service:
+    type: ClusterIP
+    ports:
+      spark: 7077  # Porta principal do cluster
+      webui: 8080  # UI do Spark
+      driver: 4040  # Porta do driver (usada pelo Zeppelin)
+    headless:
+      enabled: true  # DNS discovery para workers
 
-service:
-  type: ClusterIP
-  ports:
-    http: 80
-    https: 443
-    cluster: 7077
-  extraPorts:
-    - name: driver
-      port: 4040
-      targetPort: 4040
-      protocol: TCP  # <--- CORREÇÃO APLICADA
-  headless:
-    enabled: true    # <--- CORREÇÃO APLICADA
+# Configuração dos Workers
+worker:
+  replicas: 2
+  resources:
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+# Expor métricas e serviços adicionais
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+
+# Permissões de Serviço (Necessário para o Zeppelin)
+serviceAccount:
+  create: true
+  name: spark-serviceaccount
+
+rbac:
+  create: true
+
+# Variáveis de Ambiente Específicas
+extraEnvVars:
+  - name: SPARK_DRIVER_HOST
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  - name: SPARK_LOCAL_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+
+# Configuração de Rede Adicional
+networkPolicy:
+  enabled: true
+  allowExternal: true  # Permite conexão do Zeppelin
+
 
 

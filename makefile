@@ -3,6 +3,8 @@ NAMESPACE = spark-technical-test-data-platform
 SPARK_VALUES = spark/values.yaml
 ZEPPELIN_VALUES = corrigir-values/values.yaml
 ENV ?= minikube  # Pode ser 'k3d' ou 'minikube'
+SPARK_MASTER_URL = spark://spark-master-headless.$(NAMESPACE).svc.cluster.local:7077
+SPARK_IMAGE = bitnami/spark:4.0.0-debian-12-r2
 
 ifeq ($(ENV), minikube)
   CONTEXT = minikube
@@ -46,14 +48,19 @@ upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-p
 		-n $(NAMESPACE) \
 		--force \
 		--debug \
-		--set master.readinessProbe.initialDelaySeconds=90
+		--set master.readinessProbe.initialDelaySeconds=90 \
+		--set image.repository=bitnami/spark \
+		--set image.tag=4.0.0-debian-12-r2
 
 	@echo "🚀 Instalando Zeppelin..."
 	helm upgrade --install zeppelin ./corrigir-values -f $(ZEPPELIN_VALUES) \
-		--version 0.1.3 \
 		-n $(NAMESPACE) \
 		--force \
-		--debug
+		--debug \
+		--set interpreter.spark.properties.spark.master=$(SPARK_MASTER_URL) \
+		--set interpreter.spark.properties.spark.kubernetes.container.image=$(SPARK_IMAGE) \
+		--set ingress.hosts[0].host=$(ZEPPELIN_INGRESS_HOST) \
+		--set env.SPARK_MASTER=$(SPARK_MASTER_URL)
 
 .PHONY: deploy-all
 deploy-all: upgrade

@@ -4,6 +4,8 @@ ingress:
   enabled: true
   annotations:
     kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+    nginx.ingress.kubernetes.io/rewrite-target: /
   hosts:
     - host: zeppelin.192.168.49.2.nip.io
       paths:
@@ -11,87 +13,249 @@ ingress:
 
 serviceAccount:
   create: true
-
-interpreter:
-  spark:
-    properties:
-      spark.kubernetes.container.image: "docker.io/bitnami/spark:4.0.0-debian-12-r2"
+  name: zeppelin-serviceaccount
+  automountServiceAccountToken: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
 
 image:
   repository: apache/zeppelin
   tag: 0.11.2
   pullPolicy: IfNotPresent
+  command: ["/bin/bash"]
+  args: ["-c", "cd /opt/zeppelin && ./bin/zeppelin.sh start && tail -F /opt/zeppelin/logs/zeppelin--*.log"]
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+
+initContainers:
+  - name: spark-home-init
+    image: bitnami/spark:4.0.0-debian-12-r2
+    command: 
+      - sh
+      - -c
+      - |
+        echo 'Iniciando inicialização do Spark...'
+        mkdir -p /spark
+        echo 'Copiando arquivos do Spark...'
+        cp -rv /opt/bitnami/spark/. /spark/
+        echo 'Criando link simbólico...'
+        ln -sfn /opt/bitnami/spark /opt/spark
+        echo 'Verificando instalação...'
+        ls -la /spark/bin/spark-submit
+        echo 'InitContainer concluído com sucesso em $(date)'
+    volumeMounts:
+      - name: spark-home
+        mountPath: /spark
+      - name: spark-link
+        mountPath: /opt
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+
+  - name: spark-deps-init
+    image: bitnami/spark:4.0.0-debian-12-r2
+    command: 
+      - sh
+      - -c
+      - |
+        echo 'Preparando dependências do Spark...'
+        mkdir -p /tmp/local-repo/spark
+        echo 'Copiando JARs...'
+        cp -v /opt/bitnami/spark/jars/* /tmp/local-repo/spark/
+        echo 'Ajustando permissões...'
+        chmod -R 777 /tmp/local-repo
+        echo 'Total de JARs copiados:'
+        ls -la /tmp/local-repo/spark | wc -l
+        echo 'Dependências configuradas em $(date)'
+    volumeMounts:
+      - name: spark-repo
+        mountPath: /tmp/local-repo
+
+  - name: zeppelin-setup
+    image: busybox:1.36
+    command: 
+      - sh
+      - -c
+      - |
+        echo 'Configurando ambiente Zeppelin...'
+        chmod -R 755 /opt/zeppelin/bin
+        chown -R 1000:1000 /opt/zeppelin
+        echo 'Criando diretórios temporários...'
+        mkdir -p /tmp/.ivy2 /tmp/spark /tmp/zeppelin
+        chmod -R 777 /tmp/.ivy2 /tmp/spark /tmp/zeppelin
+        echo 'Ambiente configurado em $(date)'
+    volumeMounts:
+      - name: zeppelin-home
+        mountPath: /opt/zeppelin
+      - name: ivy-cache
+        mountPath: /tmp/.ivy2
+      - name: spark-work
+        mountPath: /tmp/spark
+      - name: zeppelin-tmp
+        mountPath: /tmp/zeppelin
 
 env:
-  SERVICE_DOMAIN: "zeppelin.192.168.49.2.nip.io"
-  ZEPPELIN_K8S_SPARK_CONTAINER_IMAGE: bitnami/spark:4.0.0-debian-12-r2
-  ZEPPELIN_K8S_CONTAINER_IMAGE: apache/zeppelin:0.11.2
-  ZEPPELIN_HOME: /opt/zeppelin
-  ZEPPELIN_PORT: 8080
-  ZEPPELIN_SERVER_RPC_PORTRANGE: 12320:12320
-  FLINK_HOME: /opt/flink
-  SPARK_MASTER: spark://spark-master-headless.default.svc.cluster.local:7077  # <--- CORREÇÃO APLICADA
+  # Configurações do Spark
+  SPARK_MASTER: "k8s://https://kubernetes.default.svc"
+  SPARK_HOME: "/opt/bitnami/spark"
+  SPARK_CONF_DIR: "/opt/bitnami/spark/conf"
+  SPARK_NO_DAEMONIZE: "true"
+  SPARK_LOG_DIR: "/opt/bitnami/spark/logs"
+  SPARK_LOCAL_DIRS: "/tmp/spark"
+  SPARK_WORKER_DIR: "/tmp/spark/work"
+  SPARK_SUBMIT_OPTIONS: "--conf spark.kubernetes.container.image=bitnami/spark:4.0.0-debian-12-r2 --conf spark.kubernetes.namespace=spark-technical-test-data-platform"
   HOST_IP:
     valueFrom:
       fieldRef:
-        fieldPath: status.podIP  # <--- CORREÇÃO APLICADA
-  SPARK_HOME: /opt/bitnami/spark  # <--- CORREÇÃO APLICADA
-  ZEPPELIN_SPARK_CONF: >-                                  # <--- CORREÇÃO APLICADA
-    --conf spark.master=spark://spark-master-headless:7077
-    --conf spark.submit.deployMode=client
-    --conf spark.driver.host=$(HOST_IP)
-    --conf spark.driver.port=4040
-    --conf spark.driver.memory=1g
-    --conf spark.executor.memory=1g
-    --conf spark.executor.instances=2
+        fieldPath: status.podIP
+  
+  # Configurações do Zeppelin
+  ZEPPELIN_HOME: "/opt/zeppelin"
+  ZEPPELIN_CONF_DIR: "/opt/zeppelin/conf"
+  JAVA_HOME: "/usr/lib/jvm/java-11-openjdk-amd64"
+  ZEPPELIN_ADDR: "0.0.0.0"
+  ZEPPELIN_PORT: "8080"
+  ZEPPELIN_INTERPRETER_LOCALREPO: "/tmp/zeppelin"
+  ZEPPELIN_PYTHON: "python3"
+  ZEPPELIN_ALLOWED_ORIGINS: "*"
+  IVY_HOME: "/tmp/.ivy2"
+  LOCAL_REPO: "/tmp/local-repo/spark"
+  ZEPPELIN_INTERPRETER_DOWNLOAD_TIMEOUT: "600000"
+  ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT: "60000"
+  ZEPPELIN_SPARK_USEHIVECONTEXT: "false"
+  ZEPPELIN_MEM: "-Xms1024m -Xmx2048m"
+  ZEPPELIN_INTP_MEM: "-Xms1024m -Xmx2048m"
+  ZEPPELIN_SERVER_PORT: "8080"
+
+interpreter:
+  spark:
+    properties:
+      spark.master: "k8s://https://kubernetes.default.svc"
+      spark.kubernetes.container.image: "bitnami/spark:4.0.0-debian-12-r2"
+      spark.driver.memory: "1g"  # Reduzido para Minikube
+      spark.executor.memory: "1g"  # Reduzido para Minikube
 
 service:
   type: ClusterIP
   port: 80
+  targetPort: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "4040"
 
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: "1"  
+    memory: "2Gi"  
   requests:
-    cpu: 250m
-    memory: 256Mi
+    cpu: "500m"
+    memory: "1Gi"
 
 autoscaling:
   enabled: false
 
+persistence:
+  enabled: true
+  size: 5Gi  # Tamanho reduzido para Minikube
+  accessMode: ReadWriteOnce
+  storageClass: "standard"
+
 configMap:
   enabled: true
   data:
-    ZEPPELIN_PORT: "8080"
-
-podAnnotations: {}
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
+    ZEPPELIN_NOTEBOOK_DIR: "/notebook"
+    ZEPPELIN_INTERPRETER_CONNECT_TIMEOUT: "60000"
+    ZEPPELIN_SPARK_CONF_DIR: "/opt/bitnami/spark/conf"
+    ZEPPELIN_SERVER_RPC_PORTRANGE: "12320:12320"
+    SPARK_HOME: "/opt/bitnami/spark"
+    PYSPARK_PYTHON: "python3"
+    PYSPARK_DRIVER_PYTHON: "python3"
+    ZEPPELIN_JAVA_OPTS: "-Dspark.driver.memory=2g -Dspark.executor.memory=2g -Dspark.kubernetes.namespace=spark-technical-test-data-platform"
 
 readinessProbe:
   httpGet:
     path: /
     port: 8080
-  initialDelaySeconds: 30
+  initialDelaySeconds: 180
   periodSeconds: 10
   timeoutSeconds: 5
-  failureThreshold: 10
+  failureThreshold: 5
 
 livenessProbe:
   httpGet:
     path: /
     port: 8080
-  initialDelaySeconds: 40
+  initialDelaySeconds: 240
   periodSeconds: 10
   timeoutSeconds: 5
-  failureThreshold: 10
+  failureThreshold: 5
 
+extraVolumes:
+  - name: spark-home
+    emptyDir: {}
+  - name: zeppelin-home
+    emptyDir: {}
+  - name: spark-link
+    emptyDir: {}
+  - name: tmp-volume
+    emptyDir: {}
+  - name: spark-repo
+    emptyDir: {}
+  - name: ivy-cache
+    emptyDir: {}
+  - name: spark-work
+    emptyDir: {}
+  - name: zeppelin-tmp
+    emptyDir: {}
+  - name: notebook-volume
+    persistentVolumeClaim:
+      claimName: zeppelin-notebook-claim
 
+extraVolumeMounts:
+  - name: zeppelin-home
+    mountPath: /opt/zeppelin
+  - name: tmp-volume
+    mountPath: /tmp
+  - name: spark-repo
+    mountPath: /tmp/local-repo
+  - name: ivy-cache
+    mountPath: /tmp/.ivy2
+  - name: spark-work
+    mountPath: /tmp/spark
+  - name: zeppelin-tmp
+    mountPath: /tmp/zeppelin
+  - name: notebook-volume
+    mountPath: /notebook
 
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "4040"
+  cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+  spark-operator.k8s.io/launched-by-spark-operator: "false"
 
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: spark-technical-test-data-platform
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 4040-4042
+          protocol: TCP
 
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
