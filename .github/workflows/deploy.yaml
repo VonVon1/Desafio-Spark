@@ -1,9 +1,10 @@
-name: Deploy Spark and Zeppelin
+nname: Deploy Spark and Zeppelin
 
 on:
   push:
     branches:
       - main
+      - 'feature/**'
   workflow_dispatch:
 
 jobs:
@@ -28,6 +29,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y make
+
+      - name: 🧹 Clean previous deployment (delete all relevant resources)
+        run: |
+          kubectl delete all,cm,secret,pvc,ingress --all -n spark-technical-test-data-platform || true
 
       - name: 🚀 Deploy Spark and Zeppelin
         run: |
@@ -63,18 +68,19 @@ jobs:
            kubectl get pods -n "$NAMESPACE"
            kubectl describe pods -n "$NAMESPACE"
            exit 1
-           fi
+          fi
          
           echo "📦 Pods:"
           kubectl get pods -n "$NAMESPACE"
          
           echo "📜 Eventos:"
-           kubectl get events -n "$NAMESPACE" --sort-by='.metadata.creationTimestamp'
+          kubectl get events -n "$NAMESPACE" --sort-by='.metadata.creationTimestamp'
          
           echo "📄 Logs iniciais:"
           for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
            echo "--- pod/$pod ---"
            kubectl logs "$pod" -n "$NAMESPACE" --tail=30 || echo "Sem logs disponíveis ainda."
           done
+
          
          

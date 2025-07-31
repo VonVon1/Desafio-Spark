@@ -33,7 +33,6 @@ spec:
       containers:
         - name: zeppelin-server
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          command: ["sh", "-c", "$(ZEPPELIN_HOME)/bin/zeppelin.sh"]
           lifecycle:
             preStop:
               exec:
@@ -89,13 +88,19 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          # volumeMounts:
-          #   - name: zeppelin-server-notebook-volume
-          #     mountPath: /zeppelin/notebook
-          #   - name: zeppelin-server-conf
-          #     mountPath: /zeppelin/conf
-          #   - name: zeppelin-server-custom-k8s
-          #     mountPath: /zeppelin/k8s
+          volumeMounts:
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+        {{- with .Values.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
+      volumes:
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -109,3 +114,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
