@@ -1,4 +1,4 @@
-nname: Deploy Spark and Zeppelin
+name: Deploy Spark and Zeppelin
 
 on:
   push:
