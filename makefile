@@ -8,13 +8,13 @@ SPARK_IMAGE = bitnami/spark:4.0.0-debian-12-r2
 
 ifeq ($(ENV), minikube)
   CONTEXT = minikube
-  CLUSTER_IP := $(shell minikube ip)
+  MINIKUBE_IP := $(shell minikube ip)
 else
   CONTEXT = k3d-test-cluster
-  CLUSTER_IP := 127.0.0.1
+  MINIKUBE_IP := 127.0.0.1
 endif
 
-ZEPPELIN_INGRESS_HOST := zeppelin.$(CLUSTER_IP).nip.io
+ZEPPELIN_INGRESS_HOST := zeppelin.$(MINIKUBE_IP).nip.io
 
 .PHONY: repo-add
 repo-add:
@@ -36,13 +36,22 @@ create-clusterrolebinding:
 	--clusterrole=cluster-admin \
 	--serviceaccount=$(NAMESPACE):zeppelin || true
 
+.PHONY: patch-values
+patch-values:
+ifeq ($(ENV), minikube)
+	@echo "🔧 Atualizando o IP no values.yaml com IP $(MINIKUBE_IP)..."
+	sed -i 's/zeppelin\.[0-9\.]*\.nip\.io/zeppelin.$(MINIKUBE_IP).nip.io/' $(ZEPPELIN_VALUES)
+else
+	@echo "🔧 Ambiente $(ENV): sem patch no values.yaml (não é Minikube)"
+endif
+
 .PHONY: reset-pods
 reset-pods:
-	@echo "🧹 Limpando pods do namespace $(NAMESPACE)..."
-	kubectl delete pods --all -n $(NAMESPACE) || true
+	@echo "🧹 Limpando recursos do namespace $(NAMESPACE)..."
+	kubectl delete all,cm,secret,pvc,ingress --all -n $(NAMESPACE) || true
 
 .PHONY: upgrade
-upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-pods
+upgrade: repo-add set-context create-namespace create-clusterrolebinding reset-pods patch-values
 	@echo "🚀 Instalando Spark..."
 	helm upgrade --install spark bitnami/spark -f $(SPARK_VALUES) \
 		-n $(NAMESPACE) \
@@ -72,6 +81,7 @@ get-info:
 	@echo "→ Spark Cluster: spark://spark-master-headless.$(NAMESPACE).svc.cluster.local:7077"
 	@echo "\nZeppelin UI:"
 	@echo "→ http://$(ZEPPELIN_INGRESS_HOST)"
+
 
 
 
