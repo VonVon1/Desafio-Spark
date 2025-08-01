@@ -38,6 +38,9 @@ Este repositório contém o provisionamento e configuração de um ambiente Apac
 9. **Tela do Zeppelin com Spark configurado**  
 📷 `09_spark_no_zeppelin.png`
 
+10. **CI CD Workflow print**  
+📷 `CI CD workflow.png`
+
 ## 🚀 Como rodar
 
 1. Suba o Minikube com `minikube start`
